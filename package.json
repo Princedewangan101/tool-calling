@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^2.5.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "tsx": "^4.22.3"
   }
 }
