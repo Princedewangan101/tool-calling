@@ -1,57 +1,152 @@
 import 'dotenv/config';
-import { GoogleGenAI, Type } from '@google/genai';
-import readline from 'node:readline/promises'
+import { FunctionResponse, GoogleGenAI, Type } from '@google/genai';
+import { calculateExponent, calculateProduct, calculateSum, exponentOfNumber, productOfNumber, sumOfTwoNumber } from './tool.js';
 
-// console.log("process.env.GEMINI_API_KEY :", process.env.GEMINI_API_KEY);
+
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY : ""
 });
 
-const sumOfTwoNumber = {
-    name: "sum",
-    description: "it adds the two numbers, for example - lets take first number be 3 and second number be 7 this tool adds 3 and 7 the result will be 10",
-    parameters: {
-        type: "object",
-        properties: {
-            firstNumber: {
-                type: "object",
-                description: "this is the first number"
+
+async function modelCall(contents: any[]) {
+    try {
+
+        return await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: contents,
+            config: {
+                tools: [{
+                    functionDeclarations: [
+                        sumOfTwoNumber, productOfNumber, exponentOfNumber
+                    ],
+                }],
             },
-            secondNumber: {
-                type: "object",
-                description: "this is the first number"
+        });
+
+    } catch (error: any) {
+        console.log(" API CALL FAILED (Network/Timeout) :", error.message);
+
+    }
+}
+
+const contents: any[] = []
+const result: any[] = [];
+
+async function start() {
+    try {
+
+        contents.push(
+            {
+                role: "user", parts: [{ text: "first calculate 3 + 4, then multiply the result by 2, then raise it to the power of 2" }]
+            },
+        )
+
+        const res1 = await modelCall(contents)
+        result.push(res1)
+
+        while (result.length > 0) {
+
+            const res = result.shift();
+
+            if (!res) {
+                console.log("❌ EXECUTION STOPS : RECEIVE EMTY RES.");
+                break;
             }
-        },
-        required: ["firstNumber", "secondNumber"],
-    },
-};
 
-// const rl = readline.createInterface({
-//     input: process.stdin,
-//     output: process.stdout,
-// });
-// const userPrompt = await rl.question('Ask Gemini something : ');
+            if (res.functionCalls && res.functionCalls.length > 0) {
 
-const userPrompt = "can u add this 2 no. 33 and 67 ?";
+                if (!res.functionCalls) { return console.log("FUNCTION CALL ARRAY NOT FOUND"); }
+                if (!res.functionCalls[0]) { return console.log("FIRST INDEX OF FUNCTION CALL ARRAY NOT FOUND"); }
+                if (!res.functionCalls[0].args) { return console.log("ARGUMENTS OF FUNCTION CALL ARRAY NOT FOUND"); }
 
-const res = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: userPrompt,
-    config: {
-        tools: [{
-            functionDeclarations: [
-                sumOfTwoNumber
-            ],
-        }],
-    },
-});
+                console.log("res.functionCalls[0].name :", res.functionCalls[0].name);
+                console.log("res.functionCalls[0].ARG :", res.functionCalls[0].args);
 
-console.log("res :", res);
-console.log("-------------------------------");
+                switch (res.functionCalls[0].name) {
+                    case "sum":
+                        console.log("CALLING SUM TOOL ...");
+                        const toolcallResult = calculateSum(res.functionCalls[0].args.firstNumber, res.functionCalls[0].args.secondNumber)
 
-console.log("Function to call:", res.functionCalls[0].name);
-console.log("Arguments provided:", res.functionCalls[0].args);
+                        console.log("toolcallResult :", toolcallResult);
+
+                        if (!res.candidates) { return console.log(-1); }
+                        if (!res.candidates[0]) { return console.log(-1); }
+
+                        contents.push(res.candidates[0].content)
+                        contents.push({ role: "user", parts: [{ functionResponse: { name: res.functionCalls[0].name, response: { output: toolcallResult } } }] })
+
+                        console.log("res.candidates[0].content :", res.candidates[0].content);
+                        console.log("THIS CONTENT WE ARE PASSING TO MODEL FOR FINAL RESPONCE:", contents);
+
+                        console.log("CALLING MODEL (SUM) ...");
+                        const res2 = await modelCall(contents)
+                        console.log("PUSHING RESULT 2 ...");
+                        result.push(res2)
+                        break;
+
+                    case "product":
+                        console.log("CALLING PRODUCT TOOL ...");
+                        const toolcallResult2 = calculateProduct(res.functionCalls[0].args.resultfromsum)
+                        console.log("toolcallResult", toolcallResult2);
+
+                        if (!res.candidates) { return console.log(-1); }
+                        if (!res.candidates[0]) { return console.log(-1); }
+
+                        contents.push(res.candidates[0].content)
+                        contents.push({ role: "user", parts: [{ functionResponse: { name: res.functionCalls[0].name, response: { output: toolcallResult2 } } }] })
+
+                        console.log("res.candidates[0].content :", res.candidates[0].content);
+                        console.log("THIS CONTENT WE ARE PASSING TO MODEL FOR FINAL RESPONCE:", contents);
+
+                        console.log("CALLING MODEL (PRODUCT) ...");
+                        const res3 = await modelCall(contents)
+                        console.log("PUSHING RESULT 3 ...");
+                        result.push(res3)
+                        break;
+
+                    case "exponent":
+                        console.log("CALLING EXPONENT TOOL ...");
+                        const toolcallResult3 = calculateExponent(res.functionCalls[0].args.resultfromPRODUCT)
+
+                        console.log("toolcallResult", toolcallResult3);
+
+                        if (!res.candidates) { return console.log(-1); }
+                        if (!res.candidates[0]) { return console.log(-1); }
+
+                        contents.push(res.candidates[0].content)
+                        contents.push({ role: "user", parts: [{ functionResponse: { name: res.functionCalls[0].name, response: { output: toolcallResult3 } } }] })
+
+                        console.log("res.candidates[0].content :", res.candidates[0].content);
+                        console.log("THIS CONTENT WE ARE PASSING TO MODEL FOR FINAL RESPONCE:", contents);
+
+                        console.log("CALLING MODEL (EXPONENT) ...");
+                        const res4 = await modelCall(contents)
+                        console.log("PUSHING RESULT 4 ...");
+                        result.push(res4)
+                        break;
+
+                    default:
+                        break;
+                }
+
+            } else {
+                console.log("DIRECT RESPONSE :", res.text);
+            }
+
+        }
+    } catch (error: any) {
+        console.log("CRITICAL RUNTIME ERROR :", error.message);
+    }
+
+}
+
+
+start()
+
+
+
+
 
 
 
